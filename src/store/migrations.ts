@@ -467,3 +467,18 @@ export function migrateToV4(persisted: unknown): Database {
     settings,
   } as Database
 }
+
+/* ============================================================================
+   v4 -> v5 — dark becomes the default theme
+
+   Nothing recorded whether a saved 'light' was picked or merely inherited, and
+   light was the default everywhere, so it is read as inherited. Picking a
+   theme now sets themeChosen, which this and any later default change leave
+   alone.
+   ========================================================================== */
+
+export function migrateToV5(state: Database): Database {
+  const settings = state.settings
+  if (!settings || settings.themeChosen || settings.theme !== 'light') return state
+  return { ...state, settings: { ...settings, theme: 'dark' } }
+}

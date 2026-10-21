@@ -127,7 +127,7 @@ function RemoteGate({ children }: { children: ReactNode }) {
         // 1. Apply the answers locally first, so what gets pushed is already
         //    the studio they asked for rather than the defaults.
         setStepLabel('Setting up your studio')
-        updateSettings({ theme: result.theme })
+        updateSettings({ theme: result.theme, themeChosen: true })
         completeSetup(
           {
             name: result.name,

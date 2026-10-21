@@ -78,7 +78,7 @@ export function Onboarding({
   ])
 
   const [accent, setAccent] = useState<Accent>(workspace.accent)
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light')
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('dark')
 
   /* Preview the look and the money format live while they are being chosen. */
   useEffect(() => {
@@ -133,7 +133,7 @@ export function Onboarding({
       return
     }
 
-    updateSettings({ theme: result.theme })
+    updateSettings({ theme: result.theme, themeChosen: true })
     completeSetup(
       {
         name: result.name,
@@ -485,8 +485,8 @@ export function Onboarding({
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                   {(
                     [
-                      { id: 'light', label: 'Light', hint: 'The studio default' },
-                      { id: 'dark', label: 'Dark', hint: 'For late edits' },
+                      { id: 'dark', label: 'Dark', hint: 'The studio default' },
+                      { id: 'light', label: 'Light', hint: 'For bright rooms' },
                       { id: 'system', label: 'System', hint: 'Follow the OS' },
                     ] as const
                   ).map((option) => (

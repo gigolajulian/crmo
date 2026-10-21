@@ -281,8 +281,8 @@ function Appearance() {
   const updateSettings = useStore((s) => s.updateSettings)
 
   const themes = [
-    { id: 'light' as const, label: 'Light', icon: Sun, hint: 'The studio default' },
-    { id: 'dark' as const, label: 'Dark', icon: Moon, hint: 'For late edits' },
+    { id: 'dark' as const, label: 'Dark', icon: Moon, hint: 'The studio default' },
+    { id: 'light' as const, label: 'Light', icon: Sun, hint: 'For bright rooms' },
     { id: 'system' as const, label: 'System', icon: Monitor, hint: 'Follow the OS' },
   ]
 
@@ -301,7 +301,7 @@ function Appearance() {
                 key={theme.id}
                 type="button"
                 onClick={() => {
-                  updateSettings({ theme: theme.id })
+                  updateSettings({ theme: theme.id, themeChosen: true })
                   toast.success(`${theme.label} theme`)
                 }}
                 aria-pressed={active}
