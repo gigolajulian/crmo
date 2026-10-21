@@ -31,7 +31,7 @@ import { createEmptyDatabase, createSeedDatabase } from '@/data/seed'
 import { arrayMove, toISODate, uid } from '@/lib/utils'
 import { setMoneyFormat } from '@/lib/intl'
 import { generatePortrait } from '@/lib/art'
-import { migrateToV4 } from './migrations'
+import { migrateToV4, migrateToV5 } from './migrations'
 import { EMPTY_BILLING } from '@/data/defaults'
 import { isClosed } from '@/data/pipeline'
 
@@ -908,7 +908,11 @@ export const useStore = create<Store>()(
         const workspace = { ...get().settings.workspace, ...patch, onboarded: true }
 
         if (start === 'empty') {
-          set(createEmptyDatabase(workspace))
+          // The theme was chosen in the same flow; an empty workspace must not
+          // fall back to the seed's.
+          const { theme, themeChosen } = get().settings
+          const empty = createEmptyDatabase(workspace)
+          set({ ...empty, settings: { ...empty.settings, theme, themeChosen } })
           return
         }
 
@@ -1005,16 +1009,16 @@ export const useStore = create<Store>()(
       resetDemoData: () => {
         const fresh = createSeedDatabase()
         // Theme and workspace identity are preferences, not demo data.
-        const { theme, workspace } = get().settings
+        const { theme, themeChosen, workspace } = get().settings
         set({
           ...fresh,
-          settings: { ...fresh.settings, theme, workspace },
+          settings: { ...fresh.settings, theme, themeChosen, workspace },
         })
       },
     }),
     {
       name: STORAGE_KEY,
-      version: 4,
+      version: 5,
       // Actions are recreated on every load; only the data is persisted.
       partialize: (state) =>
         Object.fromEntries(
@@ -1065,6 +1069,9 @@ export const useStore = create<Store>()(
        * face as your own was never right and a real upload should replace it.
        *
        * v4 folds deals and projects into shoots. See store/migrations.ts.
+       *
+       * v5 makes dark the default. Light was the only default before, so a
+       * saved 'light' without themeChosen is the old default, not a choice.
        */
       migrate: (persisted, version) => {
         let state = persisted as Database | undefined
@@ -1090,6 +1097,7 @@ export const useStore = create<Store>()(
         }
 
         if (version < 4) state = migrateToV4(state)
+        if (version < 5) state = migrateToV5(state)
 
         return state as Database
       },

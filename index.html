@@ -1,10 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="PLCBO Effect — creative relationship management. Clients, projects, moodboards, deals and approvals in one studio workspace." />
-    <meta name="theme-color" content="#E7E7E5" />
+    <meta name="theme-color" content="#111110" />
+    <!-- Dark is the default and is painted before the app loads. Only a saved
+         light (or system-and-light) choice switches it off here, so neither
+         theme flashes the other. Mirrors AppShell and the v5 store migration. -->
+    <script>
+      try {
+        var saved = JSON.parse(localStorage.getItem('crmo/v1') || 'null')
+        var s = saved && saved.state && saved.state.settings
+        var theme = s && s.theme
+        if (theme === 'light' && !s.themeChosen && saved.version < 5) theme = 'dark'
+        var light =
+          theme === 'light' ||
+          (theme === 'system' && !matchMedia('(prefers-color-scheme: dark)').matches)
+        if (light) {
+          document.documentElement.classList.remove('dark')
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#E7E7E5')
+        }
+      } catch (e) {}
+    </script>
     <!-- The hashed assets are immutable, but a cached index.html would keep
          pointing at the previous build. -->
     <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
@@ -14,6 +32,11 @@
       href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Instrument+Serif:ital@0;1&display=swap"
       rel="stylesheet"
     />
+    <!-- Before the stylesheet arrives, so the page is never briefly white. -->
+    <style>
+      html { background: #e7e7e5; }
+      html.dark { background: #111110; }
+    </style>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>CRMO</title>
   </head>
