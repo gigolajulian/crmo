@@ -43,8 +43,10 @@ accent and a theme, and choose whether to start from the demo studio or an
 empty workspace. All of it is editable afterwards under
 **Settings → Account & studio**, and **Open setup** runs the flow again.
 
-This is a **local profile, not authentication.** There is no server, so there is
-no password and no sign-in — the workspace lives in this browser's local storage.
+Without Supabase credentials this is a **local profile, not authentication**:
+no password and no sign-in, and the workspace lives in this browser's local
+storage. With them, setup runs after you sign in and the workspace lives in the
+database — see **Connecting Supabase** below.
 
 The accent is the only chromatic decision in the product; everything else is warm
 grey and near-black. Five presets ship (lime, amber, coral, sky, iris), each
@@ -52,19 +54,27 @@ defined once in `tokens.css` under a `[data-accent]` block for both themes, and
 each light enough to carry near-black text well above 4.5:1.
 
 
-## Live demo
+## Live app
 
 **https://gigolajulian.github.io/crmo/**
 
-Runs in local mode — no account, no server, everything in your browser. Deployed
+Runs in connected mode: the repository has `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` set as secrets, so the live site asks you to sign in and
+your workspace is stored in that Supabase project, not in the browser. Deployed
 from `main` by `.github/workflows/deploy.yml`.
+
+A deploy does not touch the database. When a change adds a file under
+`supabase/migrations/`, run it in the SQL editor before using the new build, or
+the app reports that the database is missing a column and keeps that change on
+the device until you do.
 
 ### Install it as an app
 
 CRMO is a Progressive Web App. In Chrome or Edge, open the live link and choose
 **Install CRMO** from the install icon at the right of the address bar (or
 **⋮ → Cast, save and share → Install page as app**). It then opens in its own
-window, from the dock or Start menu, and still opens without a connection.
+window, from the dock or Start menu. Without a connection it opens the last
+version it loaded, but signing in and syncing need the network.
 On iOS, use **Share → Add to Home Screen** in Safari.
 
 ## Connecting Supabase
@@ -73,8 +83,10 @@ Without credentials CRMO is local-only and works offline. Add them and it become
 a real multi-user app with auth, Postgres and file storage.
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, paste `supabase/migrations/0001_init.sql`, run it. That
-   creates the tables, the row-level security policies and the storage bucket.
+2. Open **SQL Editor** and run every file in `supabase/migrations/` in order,
+   starting with `0001_init.sql`. That creates the tables, the row-level security
+   policies and the storage bucket; the later files add columns the app now
+   writes.
 3. Copy **Project Settings → API** into `.env.local`:
 
    ```
@@ -185,7 +197,7 @@ A few decisions worth knowing about:
 
 ## What is mocked
 
-There is no server, so a few things stand in for real integrations. Each is
+Beyond Supabase there is no server, so a few things stand in for real integrations. Each is
 implemented so it behaves completely rather than being a dead end:
 
 | Area | How it works |
