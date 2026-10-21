@@ -23,7 +23,24 @@ import { cn } from '@/lib/utils'
      workspace exists -> hydrate, start syncing, hand over to the app
    ========================================================================== */
 
-type Phase = 'checking' | 'signed-out' | 'resolving' | 'setup' | 'provisioning' | 'ready' | 'error'
+type Phase =
+  | 'checking'
+  | 'signed-out'
+  | 'recovery'
+  | 'resolving'
+  | 'setup'
+  | 'provisioning'
+  | 'ready'
+  | 'error'
+
+/*
+ * A password reset link lands back here with the result in the hash: either a
+ * recovery session (type=recovery) or the reason it failed. Read once, before
+ * supabase-js consumes and clears it.
+ */
+const landing = new URLSearchParams(window.location.hash.slice(1))
+const arrivedToRecover = landing.get('type') === 'recovery'
+const linkError = landing.get('error_description') ?? ''
 
 export function AuthGate({ children }: { children: ReactNode }) {
   if (!isRemote) return <>{children}</>
@@ -39,6 +56,9 @@ function RemoteGate({ children }: { children: ReactNode }) {
   // Set when a workspace row already exists but is empty, so provisioning
   // fills it in rather than creating a second one.
   const [existingWorkspace, setExistingWorkspace] = useState<string | null>(null)
+  // A reset link signs you in, but the studio stays shut until a new password
+  // is chosen; otherwise following the link would skip the reset entirely.
+  const recovering = useRef(arrivedToRecover)
 
   const applySetup = useStore((s) => s.applySetup)
   const completeSetup = useStore((s) => s.completeSetup)
@@ -51,14 +71,18 @@ function RemoteGate({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
-      setPhase(data.session ? 'resolving' : 'signed-out')
+      if (!data.session) setPhase('signed-out')
+      else setPhase(recovering.current ? 'recovery' : 'resolving')
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === 'PASSWORD_RECOVERY') recovering.current = true
       setSession(next)
       if (!next) {
         stopSync()
         setPhase('signed-out')
+      } else if (recovering.current) {
+        setPhase('recovery')
       } else {
         setPhase((current) =>
           current === 'setup' || current === 'provisioning' ? current : 'resolving',
@@ -167,7 +191,18 @@ function RemoteGate({ children }: { children: ReactNode }) {
 
   /* --------------------------------------------------------------- render */
 
-  if (phase === 'signed-out') return <SignIn />
+  if (phase === 'signed-out') return <SignIn initialMessage={linkError} />
+  if (phase === 'recovery') {
+    return (
+      <SetNewPassword
+        email={session?.user.email ?? ''}
+        onDone={() => {
+          recovering.current = false
+          setPhase('resolving')
+        }}
+      />
+    )
+  }
   if (phase === 'setup') {
     return <Onboarding onProvision={provision} defaultEmail={session?.user.email ?? ''} />
   }
@@ -249,18 +284,36 @@ function Shell({ children }: { children: ReactNode }) {
   )
 }
 
-function SignIn() {
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in')
+function SignIn({ initialMessage = '' }: { initialMessage?: string }) {
+  const [mode, setMode] = useState<'sign-in' | 'sign-up' | 'reset'>('sign-in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(
+    initialMessage && `That reset link did not work: ${initialMessage}. Ask for a new one.`,
+  )
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     setBusy(true)
     setMessage('')
     const supabase = requireSupabase()
+
+    if (mode === 'reset') {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        // Back to this app, wherever it is served from.
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+      })
+      setBusy(false)
+      // Same answer whether or not the address has an account, so the form
+      // cannot be used to find out who does.
+      setMessage(
+        error
+          ? error.message
+          : `If ${email} has an account, a reset link is on its way. It opens CRMO and asks for a new password.`,
+      )
+      return
+    }
 
     const { error } =
       mode === 'sign-in'
@@ -288,25 +341,35 @@ function SignIn() {
       </div>
 
       <Card variant="raised" padding="lg" radius="3xl">
-        <div role="tablist" aria-label="Sign in or create an account" className="mb-6 flex gap-1.5">
-          {(['sign-in', 'sign-up'] as const).map((option) => (
-            <button
-              key={option}
-              role="tab"
-              aria-selected={mode === option}
-              onClick={() => {
-                setMode(option)
-                setMessage('')
-              }}
-              className={cn(
-                'h-9 flex-1 rounded-pill text-sm font-medium transition-colors duration-fast',
-                mode === option ? 'bg-inverse text-on-inverse' : 'bg-surface text-ink-muted',
-              )}
-            >
-              {option === 'sign-in' ? 'Sign in' : 'Create account'}
-            </button>
-          ))}
-        </div>
+        {mode === 'reset' ? (
+          <div className="mb-6">
+            <h2 className="text-lg font-medium tracking-tight">Reset your password</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Enter the email you sign in with and we will send you a link to choose a new
+              password.
+            </p>
+          </div>
+        ) : (
+          <div role="tablist" aria-label="Sign in or create an account" className="mb-6 flex gap-1.5">
+            {(['sign-in', 'sign-up'] as const).map((option) => (
+              <button
+                key={option}
+                role="tab"
+                aria-selected={mode === option}
+                onClick={() => {
+                  setMode(option)
+                  setMessage('')
+                }}
+                className={cn(
+                  'h-9 flex-1 rounded-pill text-sm font-medium transition-colors duration-fast',
+                  mode === option ? 'bg-inverse text-on-inverse' : 'bg-surface text-ink-muted',
+                )}
+              >
+                {option === 'sign-in' ? 'Sign in' : 'Create account'}
+              </button>
+            ))}
+          </div>
+        )}
 
         <form onSubmit={submit} className="flex flex-col gap-4">
           <Input
@@ -318,14 +381,112 @@ function SignIn() {
             required
             autoFocus
           />
+          {mode !== 'reset' && (
+            <Input
+              label="Password"
+              type="password"
+              autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
+              hint={mode === 'sign-up' ? 'At least 8 characters.' : undefined}
+              required
+            />
+          )}
+
+          {message && (
+            <p className="rounded-lg bg-surface px-3 py-2.5 text-sm text-ink-muted" role="status">
+              {message}
+            </p>
+          )}
+
+          <Button type="submit" variant="primary" block disabled={busy}>
+            {busy
+              ? 'Working…'
+              : mode === 'sign-in'
+                ? 'Sign in'
+                : mode === 'sign-up'
+                  ? 'Create account'
+                  : 'Send reset link'}
+          </Button>
+
+          {mode !== 'sign-up' && (
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === 'reset' ? 'sign-in' : 'reset')
+                setMessage('')
+              }}
+              className="self-center text-sm text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            >
+              {mode === 'reset' ? 'Back to sign in' : 'Forgot password?'}
+            </button>
+          )}
+        </form>
+      </Card>
+
+      <p className="mt-5 flex items-center justify-center gap-2 text-xs text-ink-faint">
+        <Cloud size={12} aria-hidden />
+        Connected to Supabase
+      </p>
+    </Shell>
+  )
+}
+
+/** Shown after following a reset link: the session exists, the password does not yet. */
+function SetNewPassword({ email, onDone }: { email: string; onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    if (password !== confirm) {
+      setMessage('The two passwords do not match.')
+      return
+    }
+    setBusy(true)
+    setMessage('')
+    const { error } = await requireSupabase().auth.updateUser({ password })
+    setBusy(false)
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+    onDone()
+  }
+
+  return (
+    <Shell>
+      <div className="mb-8 flex flex-col items-center gap-3 text-center">
+        <Logo size={44} />
+        <div>
+          <h1 className="text-title font-medium tracking-title">Choose a new password</h1>
+          {email && <p className="mt-1 text-base text-ink-muted">For {email}</p>}
+        </div>
+      </div>
+
+      <Card variant="raised" padding="lg" radius="3xl">
+        <form onSubmit={submit} className="flex flex-col gap-4">
           <Input
-            label="Password"
+            label="New password"
             type="password"
-            autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             minLength={8}
-            hint={mode === 'sign-up' ? 'At least 8 characters.' : undefined}
+            hint="At least 8 characters."
+            required
+            autoFocus
+          />
+          <Input
+            label="Confirm it"
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            minLength={8}
             required
           />
 
@@ -336,15 +497,10 @@ function SignIn() {
           )}
 
           <Button type="submit" variant="primary" block disabled={busy}>
-            {busy ? 'Working…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
+            {busy ? 'Saving…' : 'Save and open CRMO'}
           </Button>
         </form>
       </Card>
-
-      <p className="mt-5 flex items-center justify-center gap-2 text-xs text-ink-faint">
-        <Cloud size={12} aria-hidden />
-        Connected to Supabase
-      </p>
     </Shell>
   )
 }
