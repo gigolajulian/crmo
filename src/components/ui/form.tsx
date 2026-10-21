@@ -18,7 +18,9 @@ import { cn } from '@/lib/utils'
 const CONTROL =
   'w-full rounded-lg bg-raised px-3.5 text-base text-ink shadow-xs ' +
   'transition-[box-shadow,background-color] duration-fast ease-out-soft ' +
-  'hover:shadow-sm focus:shadow-sm disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-faint'
+  'hover:shadow-sm focus:shadow-sm disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-faint ' +
+  // A shadow does not show on a dark raised card, so dark draws the edge.
+  'dark:ring-1 dark:ring-inset dark:ring-line-strong'
 
 /* ---------------------------------------------------------------- Field -- */
 

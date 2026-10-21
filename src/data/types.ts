@@ -561,6 +561,8 @@ export interface Workspace {
 
 export interface Settings {
   theme: 'light' | 'dark' | 'system'
+  /** True once someone has picked a theme, so a new default never overrides it. */
+  themeChosen?: boolean
   density: 'comfortable' | 'compact'
   notifications: NotificationPrefs
   currentUserId: ID

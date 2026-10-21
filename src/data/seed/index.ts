@@ -77,7 +77,7 @@ export function createSeedDatabase(): Database {
       },
     ],
     settings: {
-      theme: 'light',
+      theme: 'dark',
       density: 'comfortable',
       notifications,
       currentUserId: CURRENT_USER_ID,

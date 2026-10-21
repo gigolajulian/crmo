@@ -103,7 +103,12 @@ export async function hydrate(ws: string): Promise<boolean> {
     ...next,
     settings: {
       ...state.settings,
-      theme: (prefs?.theme as Database['settings']['theme']) ?? state.settings.theme,
+      // A stored 'light' nobody picked is the old column default, not a choice.
+      theme:
+        prefs?.theme && !(prefs.theme === 'light' && prefs.theme_chosen === false)
+          ? (prefs.theme as Database['settings']['theme'])
+          : state.settings.theme,
+      themeChosen: (prefs?.theme_chosen as boolean | undefined) ?? state.settings.themeChosen,
       density: (prefs?.density as Database['settings']['density']) ?? state.settings.density,
       notifications: (prefs?.notifications as never) ?? state.settings.notifications,
       currentUserId: (prefs?.current_user_id as string) ?? state.settings.currentUserId,
@@ -214,18 +219,27 @@ async function flush() {
   armRetry()
 
   // Settings ride along with whatever else changed.
-  await supabase.from('user_settings').upsert(
-    {
-      workspace_id: workspaceId,
-      user_id: (await supabase.auth.getUser()).data.user?.id,
-      theme: state.settings.theme,
-      density: state.settings.density,
-      notifications: state.settings.notifications,
-      current_user_id: state.settings.currentUserId,
-      onboarded: true,
-    },
-    { onConflict: 'workspace_id,user_id' },
-  )
+  const prefs = {
+    workspace_id: workspaceId,
+    user_id: (await supabase.auth.getUser()).data.user?.id,
+    theme: state.settings.theme,
+    theme_chosen: state.settings.themeChosen ?? false,
+    density: state.settings.density,
+    notifications: state.settings.notifications,
+    current_user_id: state.settings.currentUserId,
+    onboarded: true,
+  }
+  const { error: prefsError } = await supabase
+    .from('user_settings')
+    .upsert(prefs, { onConflict: 'workspace_id,user_id' })
+  // Until 0006_dark_default.sql has been run the column does not exist; the
+  // rest of the preferences should still sync.
+  if (prefsError?.message.includes('theme_chosen')) {
+    const { theme_chosen: _, ...withoutChosen } = prefs
+    await supabase
+      .from('user_settings')
+      .upsert(withoutChosen, { onConflict: 'workspace_id,user_id' })
+  }
 
   await supabase
     .from('workspaces')

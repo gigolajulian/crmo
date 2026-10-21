@@ -220,7 +220,7 @@ export function BarSeries({
               <div
                 className={cn(
                   'w-full rounded-md transition-[height] duration-slow ease-out-soft',
-                  isPeak ? 'bg-lime' : 'bg-line-soft',
+                  isPeak ? 'bg-lime' : 'bg-line-soft dark:bg-line-strong',
                 )}
                 style={{ height: barHeight }}
               />
@@ -301,17 +301,18 @@ export function Heatgrid({
       {values.map((value, index) => (
         <span
           key={index}
-          className="aspect-square rounded-xs"
-          style={{
-            backgroundColor:
-              value === 0
-                ? 'var(--color-line-soft)'
-                : value < 0.34
-                  ? 'var(--color-lime-wash)'
-                  : value < 0.67
-                    ? 'var(--color-lime-pale)'
-                    : 'var(--color-lime)',
-          }}
+          className={cn(
+            'aspect-square rounded-xs',
+            // The light tints sit almost exactly on a dark raised card, so dark
+            // steps through the accent's own opacity instead.
+            value === 0
+              ? 'bg-line-soft dark:bg-line-strong'
+              : value < 0.34
+                ? 'bg-lime-wash dark:bg-lime/30'
+                : value < 0.67
+                  ? 'bg-lime-pale dark:bg-lime/60'
+                  : 'bg-lime',
+          )}
         />
       ))}
     </div>
