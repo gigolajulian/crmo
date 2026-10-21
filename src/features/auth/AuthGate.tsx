@@ -34,13 +34,19 @@ type Phase =
   | 'error'
 
 /*
- * A password reset link lands back here with the result in the hash: either a
- * recovery session (type=recovery) or the reason it failed. Read once, before
+ * A password reset link or a Google sign-in lands back here with the result in
+ * the URL: a session (type=recovery for a reset) or the reason it failed, in
+ * the hash or, for some provider errors, the query. Read once, before
  * supabase-js consumes and clears it.
  */
 const landing = new URLSearchParams(window.location.hash.slice(1))
+const landingQuery = new URLSearchParams(window.location.search)
 const arrivedToRecover = landing.get('type') === 'recovery'
-const linkError = landing.get('error_description') ?? ''
+const linkError =
+  landing.get('error_description') ?? landingQuery.get('error_description') ?? ''
+
+/** Where Supabase sends people back to: this app, wherever it is served from. */
+const RETURN_URL = `${window.location.origin}${import.meta.env.BASE_URL}`
 
 export function AuthGate({ children }: { children: ReactNode }) {
   if (!isRemote) return <>{children}</>
@@ -204,7 +210,14 @@ function RemoteGate({ children }: { children: ReactNode }) {
     )
   }
   if (phase === 'setup') {
-    return <Onboarding onProvision={provision} defaultEmail={session?.user.email ?? ''} />
+    return (
+      <Onboarding
+        onProvision={provision}
+        defaultEmail={session?.user.email ?? ''}
+        // Google hands over a name; email sign-up does not.
+        defaultName={(session?.user.user_metadata?.full_name as string | undefined) ?? ''}
+      />
+    )
   }
   if (phase === 'provisioning') {
     return <Provisioning label={stepLabel} progress={progress} />
@@ -290,8 +303,22 @@ function SignIn({ initialMessage = '' }: { initialMessage?: string }) {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(
-    initialMessage && `That reset link did not work: ${initialMessage}. Ask for a new one.`,
+    initialMessage && `That did not work: ${initialMessage}. Try again.`,
   )
+
+  async function continueWithGoogle() {
+    setBusy(true)
+    setMessage('')
+    // On success the browser leaves for Google, so busy is only ever reset on failure.
+    const { error } = await requireSupabase().auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: RETURN_URL },
+    })
+    if (error) {
+      setBusy(false)
+      setMessage(error.message)
+    }
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -302,7 +329,7 @@ function SignIn({ initialMessage = '' }: { initialMessage?: string }) {
     if (mode === 'reset') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         // Back to this app, wherever it is served from.
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+        redirectTo: RETURN_URL,
       })
       setBusy(false)
       // Same answer whether or not the address has an account, so the form
@@ -371,6 +398,26 @@ function SignIn({ initialMessage = '' }: { initialMessage?: string }) {
           </div>
         )}
 
+        {mode !== 'reset' && (
+          <>
+            <Button
+              block
+              icon={<GoogleMark />}
+              onClick={continueWithGoogle}
+              disabled={busy}
+              // The card and a secondary button share a surface; the ring keeps it a button.
+              className="ring-1 ring-line-strong ring-inset"
+            >
+              Continue with Google
+            </Button>
+            <div className="my-5 flex items-center gap-3 text-xs text-ink-faint" aria-hidden>
+              <span className="h-px flex-1 bg-line" />
+              or with email
+              <span className="h-px flex-1 bg-line" />
+            </div>
+          </>
+        )}
+
         <form onSubmit={submit} className="flex flex-col gap-4">
           <Input
             label="Email"
@@ -430,6 +477,30 @@ function SignIn({ initialMessage = '' }: { initialMessage?: string }) {
         Connected to Supabase
       </p>
     </Shell>
+  )
+}
+
+/** Google's own four-colour G, which its sign-in branding asks for. */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 18 18" width="16" height="16" aria-hidden>
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"
+      />
+    </svg>
   )
 }
 

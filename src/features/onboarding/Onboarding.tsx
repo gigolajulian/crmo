@@ -44,10 +44,12 @@ const STEPS = ['Studio', 'You', 'Money', 'Pipeline', 'Services', 'Look'] as cons
 export function Onboarding({
   onProvision,
   defaultEmail,
+  defaultName,
 }: {
   /** Connected mode: hand the answers off instead of applying them locally. */
   onProvision?: (result: SetupResult) => void
   defaultEmail?: string
+  defaultName?: string
 }) {
   const workspace = useStore((s) => s.settings.workspace)
   const completeSetup = useStore((s) => s.completeSetup)
@@ -59,7 +61,7 @@ export function Onboarding({
 
   const [name, setName] = useState('')
   const [tagline, setTagline] = useState('')
-  const [ownerName, setOwnerName] = useState('')
+  const [ownerName, setOwnerName] = useState(defaultName ?? '')
   const [ownerRole, setOwnerRole] = useState('')
   const [ownerEmail, setOwnerEmail] = useState(defaultEmail ?? '')
   const [ownerAvatar, setOwnerAvatar] = useState<string | undefined>(undefined)
