@@ -100,6 +100,41 @@ a real multi-user app with auth, Postgres and file storage.
 To deploy it connected, add the same two values as **repository secrets** named
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` — the workflow already reads them.
 
+### Google sign-in
+
+The sign-in screen offers **Continue with Google** alongside email and password.
+It needs a Google OAuth client and the Google provider switched on in Supabase.
+Until then, clicking it leaves CRMO for a Supabase error page saying the
+provider is not enabled.
+
+1. **Google Cloud Console** ([console.cloud.google.com](https://console.cloud.google.com)):
+   create a project, or pick an existing one.
+2. **APIs & Services → OAuth consent screen** (shown as *Google Auth Platform*):
+   - **Branding:** app name `CRMO`, your support email. Under **Authorized
+     domains** add `<project-ref>.supabase.co`, where `<project-ref>` is the ID in
+     your Supabase project URL.
+   - **Audience:** *External*. While the app is in *Testing*, only the Google
+     accounts listed under **Test users** can sign in, so add yours, or click
+     **Publish app**. The default scopes (email, profile, openid) are enough.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
+   - Application type: **Web application**, name `CRMO`.
+   - **Authorized JavaScript origins:** `https://gigolajulian.github.io` and
+     `http://localhost:5173`.
+   - **Authorized redirect URIs:** `https://<project-ref>.supabase.co/auth/v1/callback`.
+     Supabase shows this exact URL as the *Callback URL* in step 4.
+   - Create, then copy the **Client ID** and **Client secret**.
+4. **Supabase → Authentication → Sign In / Providers → Google:** turn it on,
+   paste the client ID and secret, save.
+5. **Supabase → Authentication → URL Configuration:**
+   - **Site URL:** `https://gigolajulian.github.io/crmo/`
+   - **Redirect URLs:** add `https://gigolajulian.github.io/crmo/` and
+     `http://localhost:5173/`.
+
+A first Google sign-in goes through setup and creates a workspace, the same as a
+new email account, with your name and email filled in from Google. If an email
+account already exists with the same confirmed address, Supabase links the two,
+so both ways in open the same workspace.
+
 **The anon key is public by design.** It ships in the JavaScript bundle. Your data
 is protected by the RLS policies in the migration and nothing else, which is why
 every table is locked to workspace members. Never put the `service_role` key in the
