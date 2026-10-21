@@ -59,6 +59,14 @@ each light enough to carry near-black text well above 4.5:1.
 Runs in local mode — no account, no server, everything in your browser. Deployed
 from `main` by `.github/workflows/deploy.yml`.
 
+### Install it as an app
+
+CRMO is a Progressive Web App. In Chrome or Edge, open the live link and choose
+**Install CRMO** from the install icon at the right of the address bar (or
+**⋮ → Cast, save and share → Install page as app**). It then opens in its own
+window, from the dock or Start menu, and still opens without a connection.
+On iOS, use **Share → Add to Home Screen** in Safari.
+
 ## Connecting Supabase
 
 Without credentials CRMO is local-only and works offline. Add them and it becomes
